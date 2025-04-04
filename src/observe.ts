@@ -12,6 +12,7 @@ export class Logger {
   private version: string;
   private betterStackToken?: string;
   private betterStackEndpoint?: string;
+  private isInitialized: boolean = false;
 
   constructor(options: {
     betterStackToken?: string;
@@ -20,32 +21,50 @@ export class Logger {
     environment?: string;
     version?: string;
   } = {}) {
+    // Try to get token from options or environment
+    this.betterStackToken = options.betterStackToken || process.env.BETTER_STACK_SOURCE_TOKEN;
+    this.betterStackEndpoint = options.betterStackEndpoint || process.env.BETTER_STACK_INGESTING_URL;
     this.service = options.service || process.env.SERVICE_NAME || 'application';
     this.environment = options.environment || process.env.NODE_ENV || 'development';
     this.version = options.version || process.env.SERVICE_VERSION || '1.0.0';
-    this.betterStackToken = options.betterStackToken;
-    this.betterStackEndpoint = options.betterStackEndpoint;
     
-    // Initialize BetterStack logger if token is provided
-    if (options.betterStackToken) {
+    // Initialize BetterStack logger
+    this.initLogtail();
+  }
+
+  // Separate initialization to allow for delayed or retry initialization
+  private initLogtail(): void {
+    if (this.isInitialized) return;
+    
+    if (this.betterStackToken) {
       try {
         // Ensure the endpoint URL has the proper https:// prefix
-        let endpoint = options.betterStackEndpoint || 'your-ingesting-url.betterstackdata.com';
+        let endpoint = this.betterStackEndpoint || 'your-ingesting-url.betterstackdata.com';
         if (!endpoint.startsWith('http://') && !endpoint.startsWith('https://')) {
           endpoint = `https://${endpoint}`;
         }
         
-        this.logtail = new Logtail(options.betterStackToken, {
-          endpoint: endpoint
+        console.debug(`[Logger] Initializing BetterStack logger with endpoint: ${endpoint}`);
+        this.logtail = new Logtail(this.betterStackToken, {
+          endpoint: endpoint,
         });
+        this.isInitialized = true;
+        console.debug(`[Logger] BetterStack logger initialized successfully`);
       } catch (error) {
-        // Silent fail
+        console.error(`[Logger] Failed to initialize BetterStack logger:`, error);
       }
+    } else {
+      console.debug(`[Logger] No BetterStack token provided, logs will only go to console`);
     }
   }
 
   // Direct console.log equivalent
   log(...args: any[]): void {
+    // Try to initialize again if not initialized
+    if (!this.isInitialized && this.betterStackToken) {
+      this.initLogtail();
+    }
+    
     console.log(...args);
     this.sendToBetterStack('info', args);
   }
@@ -76,7 +95,14 @@ export class Logger {
 
   // Helper to send to BetterStack
   private sendToBetterStack(level: 'info' | 'warn' | 'error' | 'debug', args: any[]): void {
-    if (!this.logtail) return;
+    if (!this.logtail) {
+      // Try to initialize again if we have a token but failed to initialize
+      if (this.betterStackToken && !this.isInitialized) {
+        console.log("[Logger] Attempting to reinitialize Logtail");
+        this.initLogtail();
+      }
+      if (!this.logtail) return;
+    }
     
     try {
       // Extract message and metadata
@@ -84,7 +110,8 @@ export class Logger {
       let metadata: Record<string, any> = {
         service: this.service,
         environment: this.environment,
-        version: this.version
+        version: this.version,
+        timestamp: new Date().toISOString() // Add explicit timestamp
       };
       
       // Process args similar to console.log
@@ -110,12 +137,12 @@ export class Logger {
       
       // Send to BetterStack
       if (typeof this.logtail[level] === 'function') {
-        this.logtail[level](message, metadata).catch(() => {
-          // Silent fail
+        this.logtail[level](message, metadata).catch((err) => {
+          console.error(`[Logger] Failed to send log to BetterStack:`, err);
         });
       }
     } catch (error) {
-      // Silent fail
+      console.error(`[Logger] Error in sendToBetterStack:`, error);
     }
   }
 
@@ -189,16 +216,39 @@ export class Logger {
     return newLogger;
   }
 
-  // Flush method for compatibility
+  // Flush method for compatibility with serverless environments
   async flush(): Promise<void> {
-    if (this.logtail) {
-      try {
-        await this.logtail.flush();
-      } catch (error) {
-        // Silent fail
+    return new Promise<void>((resolve) => {
+      if (!this.logtail) {
+        console.debug(`[Logger] No Logtail instance to flush`);
+        return resolve();
       }
-    }
-    return Promise.resolve();
+      
+      try {
+        console.debug(`[Logger] Flushing logs to BetterStack`);
+        
+        // Set timeout to ensure flush completes or times out
+        const timeoutId = setTimeout(() => {
+          console.warn(`[Logger] Flush timed out after 3000ms`);
+          resolve();
+        }, 3000);
+        
+        this.logtail.flush()
+          .then(() => {
+            console.debug(`[Logger] Logs flushed successfully`);
+            clearTimeout(timeoutId);
+            resolve();
+          })
+          .catch((error) => {
+            console.error(`[Logger] Error flushing logs:`, error);
+            clearTimeout(timeoutId);
+            resolve();
+          });
+      } catch (error) {
+        console.error(`[Logger] Exception during flush:`, error);
+        resolve();
+      }
+    });
   }
 }
 

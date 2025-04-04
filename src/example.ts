@@ -1,12 +1,12 @@
 /**
- * Example usage of the Observe logging utility
+ * Example usage of the console-based Observe logging utility
  */
 
 // Import the default logger instance
 import logger from '../index';
 
 // Or import specific components
-import { createLogger, format, transports } from '../index';
+import { createLogger, LogLevel } from '../index';
 
 // Use the default logger
 logger.info('Application started');
@@ -36,8 +36,7 @@ logger.debug('Processing request', {
 
 // Create a custom logger with specific configuration
 const customLogger = createLogger({
-  betterStackToken: process.env.BETTER_STACK_SOURCE_TOKEN,
-  consoleLevel: 'debug',
+  level: LogLevel.DEBUG,
   serviceContext: {
     service: 'payment-service',
     environment: 'production',
@@ -51,12 +50,15 @@ customLogger.info('Payment processing started', {
   currency: 'USD' 
 });
 
-// Ensure logs are sent before exiting
-process.on('beforeExit', async () => {
-  console.log('Flushing logs before exit...');
-  await logger.flush();
-  await customLogger.flush();
+// Create a logger with additional context
+const userLogger = logger.with({
+  service: 'user-service',
+  userId: 'user_123',
+  requestId: 'req_456'
 });
+
+userLogger.info('User profile updated');
+userLogger.debug('User details', { email: 'user@example.com' });
 
 // Example of an async function using the logger
 async function processOrder(orderId: string) {

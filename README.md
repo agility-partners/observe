@@ -8,10 +8,10 @@ Add this package directly from the GitHub repository (authentication required):
 
 ```bash
 # Using Bun with authentication token (required)
-bun add github:agility-partners/observe --token YOUR_GITHUB_TOKEN
+bun add github:agility-partners/observe
 
 # If you need to specify a branch/tag
-bun add github:agility-partners/observe#main --token YOUR_GITHUB_TOKEN
+bun add github:agility-partners/observe#main
 ```
 
 You can create a GitHub personal access token in your GitHub account settings or use your organization's token. Make sure it has the appropriate permissions to access private repositories.

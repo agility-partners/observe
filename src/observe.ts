@@ -256,7 +256,6 @@ export class Logger {
         }
 
         return new Promise<void>((resolve) => {
-            console.debug(`[Logger] Flushing logs to BetterStack`);
 
             const timeoutId = setTimeout(() => {
                 console.warn(`[Logger] Flush timed out after ${timeoutMs}ms`);
@@ -266,7 +265,6 @@ export class Logger {
             if (this.logtail) {
                 this.logtail.flush()
                     .then(() => {
-                        console.debug(`[Logger] Logs flushed successfully`);
                         clearTimeout(timeoutId);
                         resolve();
                     })

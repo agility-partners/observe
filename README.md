@@ -4,17 +4,15 @@ A TypeScript logging utility for Bun that uses Winston as the base framework and
 
 ## Installation
 
-Add this package directly from the GitHub repository (authentication required):
+Add this package directly from the GitHub repository
 
 ```bash
-# Using Bun with authentication token (required)
+# Using Bun 
 bun add github:agility-partners/observe
 
 # If you need to specify a branch/tag
-bun add github:agility-partners/observe#main
+bun add github:agility-partners/observe#b0513f4
 ```
-
-You can create a GitHub personal access token in your GitHub account settings or use your organization's token. Make sure it has the appropriate permissions to access private repositories.
 
 To use the package in your project:
 
